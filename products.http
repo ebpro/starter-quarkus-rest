@@ -1,0 +1,34 @@
+########################################
+# Environnement
+########################################
+
+# Dev environment
+@baseUrl = http://localhost:8080
+# Staging environment
+#@baseUrl = https://products.localhost:5443
+
+########################################
+# Tests ProductResource V
+########################################
+
+### GET all products V1
+GET {{baseUrl}}/api/V1/products
+Accept: application/json
+
+### GET product by SKU V1
+GET {{baseUrl}}/api/V1/products/P001
+Accept: application/json
+
+### POST create product V1
+POST {{baseUrl}}/api/V1/products
+Content-Type: application/json
+
+{
+  "sku": "P005",
+  "name": "Produit 5",
+  "price": 50.0,
+  "stock": 500
+}
+
+### DELETE product V1
+DELETE {{baseUrl}}/api/V1/products/P005

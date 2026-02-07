@@ -1,0 +1,46 @@
+http:
+  middlewares:
+    # Middleware pour auth dashboard
+    auth:
+      basicAuth:
+        usersFile: /run/secrets/traefik_users
+
+    # Security Headers globaux
+    secure-headers:
+      headers:
+        frameDeny: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+
+    # Rate Limiting global
+    rate-limit-global:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1s
+
+    # Redirect HTTP -> HTTPS
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+    modern:
+      minVersion: VersionTLS13
+      sniStrict: true
+
+  certificates:
+    - certFile: /etc/traefik/dynamic/certs/cert.pem
+      keyFile: /etc/traefik/dynamic/certs/key.pem

@@ -1,0 +1,271 @@
+# =========================================
+# Compose PRODUCTION avec Infrastructure
+# Traefik + PostgreSQL + Application
+# =========================================
+
+services:
+  # =====================================
+  # REVERSE PROXY - Traefik
+  # Ce service gère le routage, TLS, et la sécurité
+  # =====================================
+  traefik:
+    image: traefik:v3.0
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - label=disable
+    command:
+      # Dashboard et API
+      - "--ping=true" # Active le endpoint ping pour healthcheck
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+
+      # Logs
+      - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/logs/access.log"
+
+      # Providers
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=product-network"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+
+      # Redirection HTTP -> HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+
+      # Metrics (optionnel)
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-8888}:80"
+      - "${TRAEFIK_HTTPS_PORT:-5443}:443"
+      - "${TRAEFIK_DASHBOARD_PORT:-8080}:8080"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik/dynamic:/etc/traefik/dynamic
+      - ./traefik/logs:/logs
+      - ./traefik/secrets:/run/secrets:ro
+
+    networks:
+      - product-network
+
+    labels:
+      # Dashboard sécurisé via middleware auth défini dans fichier dynamique
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.${APP_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth@file"
+
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # =====================================
+  # BASE DE DONNÉES - PostgreSQL
+  # =====================================
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+      POSTGRES_DB: ${DB_NAME:-products}
+      POSTGRES_USER: ${DB_USER:-tpuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-Tp@2026}
+      # Options PostgreSQL pour performance
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+
+    # Pas de port exposé sur l'hôte pour sécurité
+    # Accès uniquement via réseau interne
+    # expose:
+    #   - "5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Scripts d'initialisation (optionnel)
+      - ./postgres/init:/docker-entrypoint-initdb.d
+
+    networks:
+      - product-network
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-tpuser} -d ${DB_NAME:-products}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    # Limites de ressources (optionnel mais recommandé)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+  # =====================================
+  # APPLICATION - Product Catalog
+  # =====================================
+  product-catalog:
+    image: ${IMAGE_GROUP:-brunoe}/${IMAGE_NAME:-product-catalog}:${IMAGE_TAG:-1.0.0-jib}
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+
+    environment:
+      # Configuration base de données
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-tpuser}
+      DB_PASSWORD: ${DB_PASSWORD:-Tp@2026}
+
+      # Stratégie Hibernate (validate en production)
+      HIBERNATE_GENERATION: ${HIBERNATE_GENERATION:-validate}
+
+      # Logs (WARNING en production)
+      LOG_LEVEL: ${LOG_LEVEL:-WARN}
+      LOG_SQL: ${LOG_SQL:-false}
+
+      # JVM Options optimisées pour production
+      JAVA_OPTS: >-
+        -Xms512m
+        -Xmx1024m
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=75.0
+        -XX:+UseG1GC
+        -XX:MaxGCPauseMillis=100
+        -XX:+DisableExplicitGC
+
+    # Pas de port exposé, uniquement via Traefik
+    expose:
+      - "8080"
+
+    networks:
+      - product-network
+    # Traefik labels : routage HTTPS sécurisé avec Let's Encrypt,
+    # redirection HTTP->HTTPS, load balancing et middlewares globaux (sécurité + rate limiting)
+    labels:
+      - "traefik.enable=true" # Active Traefik pour ce container
+
+      # Router HTTPS principal
+      - "traefik.http.routers.product-catalog.rule=Host(`${APP_DOMAIN:-products.localhost}`)" # Route vers le host de l'application
+      - "traefik.http.routers.product-catalog.entrypoints=websecure" # Utilise l'entrypoint HTTPS
+      - "traefik.http.routers.product-catalog.tls=true" # TLS activé
+      - "traefik.http.routers.product-catalog.tls.options=default" # Utilise le TLS self-signed défini dans dynamic.yml
+      - "traefik.http.routers.product-catalog.middlewares=secure-headers@file,rate-limit-global@file" # Middleware headers + rate-limit défini dans dynamic.yml
+      - "traefik.http.services.product-catalog.loadbalancer.server.port=8080" # Port interne de l'application
+
+      # Router HTTP → HTTPS (redirection)
+      - "traefik.http.routers.product-catalog-http.rule=Host(`${APP_DOMAIN:-products.localhost}`)" # Route HTTP vers le même host
+      - "traefik.http.routers.product-catalog-http.entrypoints=web" # Entrypoint HTTP
+      - "traefik.http.routers.product-catalog-http.middlewares=redirect-to-https@file" # Redirection HTTP → HTTPS
+
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    # Limites de ressources
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1536M
+        reservations:
+          cpus: "1.0"
+          memory: 768M
+
+  # =====================================
+  # MONITORING - Prometheus (optionnel)
+  # =====================================
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:Z
+      - prometheus_data:/prometheus
+    networks:
+      - product-network
+    labels:
+      - "traefik.enable=true" # Active Traefik pour ce container
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${APP_DOMAIN:-localhost}`)" # Route les requêtes HTTPS vers ce host
+      - "traefik.http.routers.prometheus.entrypoints=websecure" # Utilise l'entrypoint HTTPS
+      - "traefik.http.routers.prometheus.tls=true" # Active TLS sur ce router
+      - "traefik.http.routers.prometheus.tls.options=default" # Utilise le TLS self-signed défini dans dynamic.yml
+      - "traefik.http.routers.prometheus.middlewares=auth@file" # Middleware Basic Auth + redirection HTTP → HTTPS
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090" # Port interne sur lequel Prometheus écoute
+
+  # =====================================
+  # MONITORING - Grafana (optionnel)
+  # =====================================
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SERVER_ROOT_URL: https://grafana.${APP_DOMAIN:-localhost}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:Z
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:Z
+    networks:
+      - product-network
+    depends_on:
+      - prometheus
+    labels:
+      - "traefik.enable=true" # Active Traefik pour ce container
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${APP_DOMAIN:-localhost}`)" # Route les requêtes vers le host Grafana
+      - "traefik.http.routers.grafana.entrypoints=websecure" # Utilise l'entrypoint HTTPS
+      - "traefik.http.routers.grafana.tls=true" # TLS activé
+      - "traefik.http.routers.grafana.tls.options=default" # Utilise le TLS self-signed défini dans dynamic.yml
+      - "traefik.http.routers.grafana.middlewares=auth@file" # Middleware Basic Auth + redirection HTTP → HTTPS
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000" # Port interne Grafana
+
+volumes:
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  product-network:
+    driver: bridge
+    name: product-network

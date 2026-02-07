@@ -1,0 +1,33 @@
+# =========================================
+# Configuration Prometheus
+# =========================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'product-catalog-monitor'
+
+# Scrape configs
+scrape_configs:
+  # Traefik metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+    metrics_path: '/metrics'
+
+  # Quarkus application metrics
+  - job_name: 'product-catalog'
+    static_configs:
+      - targets: ['product-catalog:8080']
+    metrics_path: '/q/metrics'
+
+  # PostgreSQL exporter (si ajouté)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Prometheus lui-même
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

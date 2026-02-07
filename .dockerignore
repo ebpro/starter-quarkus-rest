@@ -1,0 +1,30 @@
+# Maven / build
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# IDE / OS
+*.iml
+.idea/
+.vscode/
+*.swp
+*.class
+*.log
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Node / front (si jamais)
+node_modules/
+dist/
+
+# Autres fichiers temporaires
+*.tmp
+*.bak
