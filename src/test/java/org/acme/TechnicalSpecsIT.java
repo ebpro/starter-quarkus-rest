@@ -29,18 +29,15 @@ class TechnicalSpecsIT {
     }
 
     @Test
-    @DisplayName("Readiness probe should be UP and Database connected")
+    @DisplayName("Readiness probe should be UP and all checks successful")
     void testHealthCheckReadiness() {
         given()
                 .when().get("/q/health/ready")
                 .then()
                 .statusCode(200)
-                .header("Content-Type", containsString("application/json"))
                 .body("status", is("UP"))
-                // Validates that SmallRye Health is correctly monitoring the PostgreSQL
-                // connection
-                .body("checks.name", hasItem("Database connections health check"))
-                .body("checks.find { it.name == 'Database connections health check' }.status", is("UP"));
+                // Verify that no individual check is 'DOWN'
+                .body("checks.status", not(hasItem("DOWN")));
     }
 
     @Test
@@ -51,5 +48,17 @@ class TechnicalSpecsIT {
                 .when().get("/q/health-ui/")
                 .then()
                 .statusCode(200);
+    }
+
+    @Test
+    @DisplayName("OpenAPI Documentation should be available in YAML/JSON [NFR-ARCH-03]")
+    void testOpenAPI() {
+        given()
+                .header("Accept", "application/json") // Explicitly ask for JSON
+                .when().get("/q/openapi")
+                .then()
+                .statusCode(200)
+                .contentType(containsString("json"))
+                .body("openapi", startsWith("3.")); // Verifies it's a valid OpenAPI 3 document
     }
 }

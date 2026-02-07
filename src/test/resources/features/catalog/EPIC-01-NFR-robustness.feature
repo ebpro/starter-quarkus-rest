@@ -1,4 +1,6 @@
-@v1 @NFR @Security
+@v1
+@NFR
+@Security
 Feature: Catalog Robustness and Security
   In order to ensure system stability and data integrity
   As a store manager
