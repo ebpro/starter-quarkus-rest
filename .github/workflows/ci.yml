@@ -8,59 +8,71 @@ on:
 
 jobs:
   build:
+    name: Build & Push Container
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Essential to get git logs for the timestamp
 
-    - name: Set up JDK 21
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: maven
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
 
-    - name: Build with Maven
-      # We run 'verify' to trigger Surefire (Unit) and Failsafe (Integration/Cucumber)
-      run: |
-        # Get the timestamp of the latest commit
-        TIMESTAMP=$(git log -1 --format=%cI)
-        ./mvnw -B verify -Dproject.build.outputTimestamp=$TIMESTAMP
-    - name: Login to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Build and Push Multi-arch Image
-      run: |
-        # Get the timestamp of the latest commit
-        TIMESTAMP=$(git log -1 --format=%cI)
-        ./mvnw clean package -Dproject.build.outputTimestamp=$TIMESTAMP \
-          -Pjvm \
-          -Dquarkus.container-image.push=true \
-          -Dquarkus.container-image.registry=docker.io \
-          -Dquarkus.jib.platforms=linux/amd64,linux/arm64
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build, Test and Push Image
+        run: |
+          # 1. Capture the exact commit timestamp for bit-for-bit reproducibility
+          TIMESTAMP=$(git log -1 --format=%cI)
+
+          # 2. Run the full lifecycle: verify (tests) + package (Jib)
+          ./mvnw -B clean package \
+            -Dproject.build.outputTimestamp=$TIMESTAMP \
+            -Pjvm \
+            -Dquarkus.container-image.push=true \
+            -Dquarkus.container-image.registry=docker.io \
+            -Dquarkus.jib.platforms=linux/amd64,linux/arm64
+
+      - name: Upload OpenAPI Spec
+        # Save the file generated in target/openapi-spec/ for the Docs job
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: target/openapi-spec/openapi.yaml
+          retention-days: 1
 
   deploy-docs:
+    name: Deploy API Documentation
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    # Only deploy docs on main/develop branch pushes, not for PRs
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Download OpenAPI Spec
+        uses: actions/download-artifact@v4
         with:
-          node-version: '20' # Explicitly set a stable LTS version
+          name: openapi-spec
+          path: target/openapi-spec/
 
       - name: Build Redoc HTML
         run: |
           mkdir -p public
-          # Use npx to run the latest Redocly CLI without manual install
-          npx --yes @redocly/cli build-docs target/openapi-spec/openapi.yaml --output public/index.html
+          # We use the artifact path. --silent hides npm deprecation noise.
+          npx --yes @redocly/cli build-docs target/openapi-spec/openapi.yaml \
+            --output public/index.html \
+            --silent
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
