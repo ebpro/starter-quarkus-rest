@@ -28,6 +28,7 @@ jobs:
       ########################################
       - name: Build + Test + Sonar
         env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           TIMESTAMP=$(git log -1 --format=%cI)
