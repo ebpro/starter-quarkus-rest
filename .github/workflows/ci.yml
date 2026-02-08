@@ -60,7 +60,7 @@ jobs:
         run: |
           mkdir -p public
           # Use npx to run the latest Redocly CLI without manual install
-          npx --yes @redocly/cli build-docs src/main/resources/META-INF/openapi.yaml --output public/index.html
+          npx --yes @redocly/cli build-docs target/openapi-spec/openapi.yaml --output public/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
