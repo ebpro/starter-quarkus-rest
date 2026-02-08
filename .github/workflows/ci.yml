@@ -24,29 +24,10 @@ jobs:
           cache: maven
 
       ########################################
-      # Setup temporary Sonar trust store
-      ########################################
-      - name: Import Sonar self-signed certificate
-        run: |
-          openssl s_client -connect compute-lsis-2.lis-lab.fr:443 \
-            -servername compute-lsis-2.lis-lab.fr </dev/null \
-            | openssl x509 -outform PEM > sonar.crt
-
-          keytool -import \
-            -alias sonarqube \
-            -file sonar.crt \
-            -keystore sonar_trust.jks \
-            -storepass changeit \
-            -noprompt
-
-          rm sonar.crt
-
-      ########################################
       # Sonar analysis
       ########################################
       - name: Build + Test + Sonar
         env:
-          MAVEN_OPTS: "-Djavax.net.ssl.trustStore=sonar_trust.jks -Djavax.net.ssl.trustStorePassword=changeit"
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           TIMESTAMP=$(git log -1 --format=%cI)
