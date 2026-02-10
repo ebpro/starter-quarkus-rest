@@ -122,31 +122,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # --- Install node in self-hosted runner ---
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Generate Spec Only
+        run: ./mvnw quarkus:generate-code
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      # ---------------------
 
-      - name: Build Redoc
+      - name: Build Redoc & Prepare Assets
         run: |
           mkdir -p public
-          # Check for the OpenAPI spec
-          if [ -f "target/openapi.yaml" ]; then
-            SPEC="target/openapi.yaml"
-          elif [ -f "src/main/resources/openapi.yaml" ]; then
-            SPEC="src/main/resources/openapi.yaml"
-          else
-            echo "Error: OpenAPI spec not found!"
-            exit 1
-          fi
+          # Build HTML and add a download button for the YAML
+          npx --yes @redocly/cli build-docs \
+              target/openapi-spec/openapi.yaml \
+              --output public/index.html \
+              --options.downloadDefinitionUrl=openapi.yaml
 
-          # Now npx will be available
-          npx --yes @redocly/cli build-docs $SPEC --output public/index.html
+          # Copy raw YAML for machine/UI download
+          cp target/openapi-spec/openapi.yaml public/openapi.yaml
 
-      - name: Deploy
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
+          # 'main' goes to root, 'develop' goes to /develop folder
+          destination_dir: ${{ github.ref == 'refs/heads/main' && '.' || github.ref_name }}
+          # KEEP_FILES=true prevents develop from deleting main and vice versa
+          keep_files: true
+
+      - name: Upload to GitHub Release (Tags Only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/openapi-spec/openapi.yaml
