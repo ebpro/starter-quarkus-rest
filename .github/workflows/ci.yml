@@ -18,12 +18,11 @@ env:
   TIMESTAMP: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
 
 jobs:
-  # JOB 1: Test and Push JVM (The "Reliable" version)
-  build-jvm:
+  # JOB 1: Test, Push JVM, and Deploy Docs
+  build-jvm-and-docs:
     runs-on: self-hosted
     outputs:
       primary_tag: ${{ steps.tag_logic.outputs.primary }}
-      additional_tags: ${{ steps.tag_logic.outputs.additional }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -81,9 +80,39 @@ jobs:
             -Dquarkus.container-image.tag=${{ steps.tag_logic.outputs.primary }} \
             -Dquarkus.container-image.additional-tags=${{ steps.tag_logic.outputs.additional }}
 
-  # JOB 2: Build and Push Native (The "Fast" version)
+      # --- Documentation Steps Integrated Here ---
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Redoc & Prepare Assets
+        run: |
+          mkdir -p public
+          npx --yes @redocly/cli build-docs \
+              target/openapi-spec/openapi.yaml \
+              --output public/index.html \
+              --theme.openapi.downloadDefinitionUrl=openapi.yaml
+          cp target/openapi-spec/openapi.yaml public/openapi.yaml
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          destination_dir: ${{ github.ref == 'refs/heads/main' && '.' || github.ref_name }}
+          keep_files: true
+
+      - name: Upload to GitHub Release (Tags Only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/openapi-spec/openapi.yaml
+
+  # JOB 2: Build and Push Native (Parallel to save total pipeline time)
   build-native:
-    needs: build-jvm
+    needs: build-jvm-and-docs
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: self-hosted
     steps:
@@ -105,61 +134,9 @@ jobs:
 
       - name: Push Native Image
         run: |
-          # Use -native suffix for the primary tag
-          NATIVE_TAG="${{ needs.build-jvm.outputs.primary_tag }}-native"
-
+          NATIVE_TAG="${{ needs.build-jvm-and-docs.outputs.primary_tag }}-native"
           ./mvnw package -Pnative -DskipTests \
             -Dquarkus.container-image.push=true \
             -Dquarkus.container-image.username=${{ secrets.DOCKERHUB_USERNAME }} \
             -Dquarkus.container-image.password=${{ secrets.DOCKERHUB_TOKEN }} \
             -Dquarkus.container-image.tag=$NATIVE_TAG
-
-  # JOB 3: Documentation (Parallel)
-  deploy-docs:
-    needs: build-jvm
-    runs-on: self-hosted
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Generate Spec
-        run: ./mvnw quarkus:generate-code
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build Redoc & Prepare Assets
-        run: |
-          mkdir -p public
-          # Corrected flag for download definition
-          npx --yes @redocly/cli build-docs \
-              target/openapi-spec/openapi.yaml \
-              --output public/index.html \
-              --theme.openapi.downloadDefinitionUrl=openapi.yaml
-
-          # Copy raw YAML for UI/Client download
-          cp target/openapi-spec/openapi.yaml public/openapi.yaml
-
-      - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          destination_dir: ${{ github.ref == 'refs/heads/main' && '.' || github.ref_name }}
-          keep_files: true
-
-      - name: Upload to GitHub Release (Tags Only)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: target/openapi-spec/openapi.yaml
