@@ -82,8 +82,10 @@ jobs:
       # 7. Set up Docker Buildx (multi-arch)
       ##########################################################
       - name: Set up Docker Buildx
-        run: |
-          docker buildx create --use || echo "Buildx already exists"
+        uses: docker/setup-buildx-action@v2
+        with:
+          install: true           # Ensures buildx is installed
+          version: latest         # Optional, can pin a version
 
       ##########################################################
       # 8. Build & Push JVM Docker Image (multi-arch)
