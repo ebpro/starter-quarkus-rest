@@ -1,47 +1,47 @@
-name: Java CI with Maven (Self-Hosted + Dynamic Docker)
+name: Java CI with Maven (Quarkus + Jib + SemVer)
 
 on:
   push:
-    branches: [ "develop", "main", "**/feature/**" ]
+    branches: [ "develop", "main" ]
+    tags: [ 'v*.*.*' ]
   pull_request:
-    branches: [ "develop", "main", "**/feature/**" ]
+    branches: [ "develop", "main" ]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 env:
-  REGISTRY: docker.io             # Docker registry
-  ACCOUNT: brunoe                  # Docker Hub username/namespace
-  TIMESTAMP: ${{ github.event.head_commit.timestamp }}
+  REGISTRY: docker.io
+  ACCOUNT: brunoe
+  # Fallback for TIMESTAMP if head_commit is null (e.g. on PRs)
+  TIMESTAMP: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
 
 jobs:
   build-and-deploy:
-    name: CI Pipeline
     runs-on: self-hosted
-    # To run on GitHub-hosted runners, uncomment below:
-    # runs-on: ubuntu-latest
-
     steps:
-
-      ##########################################################
-      # 1. Checkout
-      ##########################################################
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       ##########################################################
-      # 2. Set Docker Image Name dynamically from repo
+      # 1. Extract Metadata (The SemVer Brain)
       ##########################################################
-      - name: Set Docker Image Name
-        id: docker_name
-        run: |
-          REPO_NAME="${GITHUB_REPOSITORY##*/}"
-          IMAGE_NAME="${ACCOUNT}/$REPO_NAME"
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
-          echo "Docker image will be: $IMAGE_NAME"
+      - name: Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ACCOUNT }}/${{ github.event.repository.name }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      ##########################################################
-      # 3. Set up JDK + Maven cache
-      ##########################################################
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -50,28 +50,17 @@ jobs:
           cache: maven
 
       ##########################################################
-      # 4. Build & Test
+      # 2. Build, Test, and Sonar (Single Pass)
       ##########################################################
-      - name: Build & Test
-        run: |
-          ./mvnw -B clean verify \
-            -Dproject.build.outputTimestamp=$TIMESTAMP
-
-      ##########################################################
-      # 5. SonarQube Analysis
-      ##########################################################
-      - name: Run SonarQube Analysis
+      - name: Build & Sonar Analysis
         env:
           SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./mvnw -B sonar:sonar \
-            -Dproject.build.outputTimestamp=$TIMESTAMP \
-            -Psonar
+          ./mvnw -B clean verify sonar:sonar \
+            -Psonar \
+            -Dproject.build.outputTimestamp=${{ env.TIMESTAMP }}
 
-      ##########################################################
-      # 6. Docker Login
-      ##########################################################
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
@@ -79,99 +68,50 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       ##########################################################
-      # 7. Set up Docker Buildx (multi-arch)
+      # 3. Jib Push (Multi-arch + Dynamic Tags)
       ##########################################################
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          install: true           # Ensures buildx is installed
-          version: latest         # Optional, can pin a version
+      - name: Push to DockerHub (Jib)
+        run: |
+          # Transform the multiline tags from metadata action into a comma-separated list
+          TAG_LIST=$(echo "${{ steps.meta.outputs.tags }}" | sed 's/.*://' | tr '\n' ',' | sed 's/,$//')
+
+          ./mvnw package -DskipTests -Pjvm \
+            -Dquarkus.container-image.push=true \
+            -Dquarkus.jib.platforms=linux/amd64,linux/arm64 \
+            -Dquarkus.container-image.tag=$TAG_LIST
 
       ##########################################################
-      # 8. Build & Push JVM Docker Image (multi-arch)
+      # 4. Native Build (Main only - no push by default to save time)
       ##########################################################
-      - name: Build & Push JVM Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: src/main/docker/Dockerfile.jvm
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.created=${{ env.TIMESTAMP }}
-
-      ##########################################################
-      # 9. Optional Native Build (main branch only)
-      ##########################################################
-      - name: Build Native Image
+      - name: Build Native Executable
         if: github.ref == 'refs/heads/main'
-        run: |
-          ./mvnw -B package \
-            -DskipTests \
-            -Dproject.build.outputTimestamp=$TIMESTAMP \
-            -Pnative
+        run: ./mvnw package -Pnative -DskipTests
 
       ##########################################################
-      # 10. Upload OpenAPI Spec Artifact
-      ##########################################################
-      - name: Upload OpenAPI Spec Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: openapi-spec
-          path: target/openapi-spec/openapi.yaml
-          retention-days: 7
-
-      ##########################################################
-      # 11a. Set normalized branch name for tags
-      ##########################################################
-      - name: Normalize Branch Name
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-        run: |
-          NORMALIZED_BRANCH=${GITHUB_REF#refs/heads/}
-          NORMALIZED_BRANCH=${NORMALIZED_BRANCH//\//-}
-          echo "NORMALIZED_BRANCH=$NORMALIZED_BRANCH" >> $GITHUB_ENV
-
-      ##########################################################
-      # 11b. Create GitHub Release
-      ##########################################################
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}-${{ github.run_number }}
-          name: "OpenAPI Spec for ${{ github.ref_name }}"
-          body: "OpenAPI spec generated from CI run ${{ github.run_number }} on branch ${{ github.ref_name }}"
-          draft: false
-          prerelease: ${{ github.ref != 'refs/heads/main' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      ##########################################################
-      # 12. Setup Node.js
-      ##########################################################
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      ##########################################################
-      # 13. Build Redoc HTML
+      # 5. Docs & Releases
       ##########################################################
       - name: Build Redoc HTML
         run: |
           mkdir -p public
-          npx --yes @redocly/cli build-docs target/openapi-spec/openapi.yaml --output public/index.html
+          # Note: Quarkus usually generates OpenAPI at target/openapi.yaml
+          # Verify your specific path if 'target/openapi-spec/' is custom
+          SPEC_PATH="target/openapi.yaml"
+          [ -f "target/openapi-spec/openapi.yaml" ] && SPEC_PATH="target/openapi-spec/openapi.yaml"
 
-      ##########################################################
-      # 14. Deploy to GitHub Pages (Main/Develop only)
-      ##########################################################
+          npx --yes @redocly/cli build-docs $SPEC_PATH --output public/index.html
+
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/*.jar
+            target/openapi.yaml
+          generate_release_notes: true
