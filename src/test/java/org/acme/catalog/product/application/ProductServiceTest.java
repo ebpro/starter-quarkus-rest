@@ -1,6 +1,5 @@
 package org.acme.catalog.product.application;
 
-import org.acme.catalog.product.application.ProductService;
 import org.acme.catalog.product.application.dto.ProductDTO;
 import org.acme.catalog.product.application.dto.usecases.CreateProductRequest;
 import org.acme.catalog.product.infrastructure.persistence.ProductEntity;
