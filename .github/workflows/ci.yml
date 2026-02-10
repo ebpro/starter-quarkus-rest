@@ -124,25 +124,27 @@ jobs:
           retention-days: 7
 
       ##########################################################
-      # 11. Create GitHub Release (Main/Develop) & Attach OpenAPI Spec
+      # 11a. Set normalized branch name for tags
+      ##########################################################
+      - name: Normalize Branch Name
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        run: |
+          NORMALIZED_BRANCH=${GITHUB_REF#refs/heads/}
+          NORMALIZED_BRANCH=${NORMALIZED_BRANCH//\//-}
+          echo "NORMALIZED_BRANCH=$NORMALIZED_BRANCH" >> $GITHUB_ENV
+
+      ##########################################################
+      # 11b. Create GitHub Release
       ##########################################################
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name // '/' / '-' }}-${{ github.run_number }}
+          tag_name: ${{ github.ref_name }}-${{ github.run_number }}
           name: "OpenAPI Spec for ${{ github.ref_name }}"
           body: "OpenAPI spec generated from CI run ${{ github.run_number }} on branch ${{ github.ref_name }}"
           draft: false
-          prerelease: ${{ github.ref_name != 'main' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload OpenAPI Spec to Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: target/openapi-spec/openapi.yaml
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
