@@ -121,12 +121,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # --- Install node in self-hosted runner ---
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # ---------------------
+
       - name: Build Redoc
         run: |
           mkdir -p public
-          # Adjust this path based on your openapi output location
-          [ -f "target/openapi.yaml" ] && SPEC="target/openapi.yaml" || SPEC="src/main/resources/openapi.yaml"
+          # Check for the OpenAPI spec
+          if [ -f "target/openapi.yaml" ]; then
+            SPEC="target/openapi.yaml"
+          elif [ -f "src/main/resources/openapi.yaml" ]; then
+            SPEC="src/main/resources/openapi.yaml"
+          else
+            echo "Error: OpenAPI spec not found!"
+            exit 1
+          fi
+
+          # Now npx will be available
           npx --yes @redocly/cli build-docs $SPEC --output public/index.html
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
