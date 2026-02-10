@@ -7,28 +7,50 @@
     <version>1.0.0-SNAPSHOT</version>
 
     <properties>
-        <compiler-plugin.version>3.15.0</compiler-plugin.version>
+        <!-- Java release level for the compiler (source/target) -->
         <maven.compiler.release>21</maven.compiler.release>
+
+        <!-- Maven Compiler Plugin: plugin version used to compile the project -->
+        <compiler-plugin.version>3.15.0</compiler-plugin.version>
+        <!-- Maven Enforcer Plugin: enforcer plugin version -->
+        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
+        <!-- Versions plugin: used for dependency/version updates -->
+        <versions-plugin.version>2.21.0</versions-plugin.version>
+
+        <!-- Encoding properties: ensure consistent encoding across all plugins and reports -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Quarkus platform BOM coordinates -->
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.31.2</quarkus.platform.version>
+
+        <!-- Test framework versions -->
+        <!-- Surefire plugin: unit-test runner version -->
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
-        <testcontainers.version>1.21.4</testcontainers.version>
-        <versions-plugin.version>2.21.0</versions-plugin.version>
-        <quarkus-cucumber.version>1.3.0</quarkus-cucumber.version>
+        <!-- Cucumber: version used by Cucumber test dependencies -->
         <cucumber.version>7.34.2</cucumber.version>
+        <!-- Quarkus Cucumber integration version (testing) -->
+        <quarkus-cucumber.version>1.3.0</quarkus-cucumber.version>
+        <!-- Testcontainers: version for integration test containers -->
+        <testcontainers.version>1.21.4</testcontainers.version>
+        <!-- ArchUnit: version for architecture tests -->
         <archunit.version>1.4.1</archunit.version>
-        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
 
-
+        <!-- Quality and coverage plugin versions -->
+        <!-- SonarQube (quality) plugin version -->
         <sonar.maven.plugin.version>5.5.0.6356</sonar.maven.plugin.version>
+        <!-- JaCoCo (code coverage) plugin version -->
         <jacoco.maven.plugin.version>0.8.14</jacoco.maven.plugin.version>
 
+        <!-- For reproducible builds -->
         <project.build.outputTimestamp>2026-02-07T15:00:00Z</project.build.outputTimestamp>
     </properties>
 
+    <!-- Import Quarkus platform BOM for dependency version management -->
+    <!-- This ensures that all Quarkus dependencies use compatible versions as defined by the platform BOM -->
+    <!-- Not loaded as a regular dependency, but used to manage versions of Quarkus dependencies in the project -->
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -41,15 +63,11 @@
         </dependencies>
     </dependencyManagement>
 
+    <!-- Project dependencies -->
     <dependencies>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-jackson</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-jackson</artifactId>
-        </dependency>
+        <!-- Quarkus dependencies: these are the libraries that provide the functionality for the application, such as REST endpoints, database access, JSON handling, etc. -->
+
+        <!-- Database and ORM -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-jdbc-postgresql</artifactId>
@@ -58,6 +76,24 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-hibernate-orm-rest-data-panache</artifactId>
         </dependency>
+
+        <!-- Rest and JSON handling -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-client-jackson</artifactId>
+        </dependency>
+
+        <!-- Hibernate Validator -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-validator</artifactId>
+        </dependency>
+
+        <!-- OpenAPI and Health -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-openapi</artifactId>
@@ -66,29 +102,43 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-health</artifactId>
         </dependency>
+
+        <!-- Dependency injection -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
         </dependency>
+
+        <!-- Container image building -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-container-image-jib</artifactId>
         </dependency>
+
+        <!-- Test framework dependencies -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- REST Assured for testing REST endpoints -->
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Mockito for mocking dependencies in tests -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit-mockito</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testcontainers for integration testing with containers -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
@@ -102,16 +152,15 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>io.quarkiverse.cucumber</groupId>
             <artifactId>quarkus-cucumber</artifactId>
             <version>${quarkus-cucumber.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Cucumber for Behavior Driven Development (BDD) testing -->
+        <!-- quarkus-cucumber provides integration between Cucumber and Quarkus,
+         allowing you to write BDD tests that can leverage Quarkus features
+         and run in the same environment as your application -->
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-java</artifactId>
@@ -130,30 +179,29 @@
             <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
-
+        <!-- ArchUnit JUnit 5 Engine: this dependency allows you to run
+         ArchUnit tests using the JUnit 5 test engine, enabling you to define
+         and execute architectural tests as part of your test suite. -->
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5-engine</artifactId>
             <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
-
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-hibernate-validator</artifactId>
-        </dependency>
-
     </dependencies>
 
     <build>
 
+        <!-- Plugin management: defines versions and configuration for plugins used in the build, such as the Quarkus Maven plugin for building the application, the Surefire plugin for running tests, and plugins for code quality and coverage analysis. -->
         <pluginManagement>
             <plugins>
+                <!-- Plugin to use SonarQube for code quality analysis -->
                 <plugin>
                     <groupId>org.sonarsource.scanner.maven</groupId>
                     <artifactId>sonar-maven-plugin</artifactId>
                     <version>${sonar.maven.plugin.version}</version>
                 </plugin>
+                <!-- Plugin to use JaCoCo for code coverage analysis -->
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
@@ -162,7 +210,10 @@
             </plugins>
         </pluginManagement>
 
+        <!-- Build plugins: these are the plugins that will be executed during the build process, such as compiling the code, running tests, and building container images. -->
+
         <plugins>
+            <!-- Quarkus Maven plugin: used to build the Quarkus application, generate code, and create native images. It is configured to execute goals for building the application, generating code, and running the native image agent. -->
             <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
@@ -179,6 +230,7 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Compiler plugin: used to compile the Java source code. It is configured to include parameter names in the compiled bytecode, which can be useful for reflection and testing. -->
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${compiler-plugin.version}</version>
@@ -187,7 +239,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Surefire / Tests -->
+            <!-- Surefire / Unit Tests -->
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
@@ -204,7 +256,6 @@
                     <forkNode implementation="org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory"/>
                 </configuration>
             </plugin>
-
 
             <!-- Failsafe / Integration Tests -->
             <plugin>
@@ -233,7 +284,11 @@
                 </configuration>
             </plugin>
 
-            <!-- Versions plugin: use organization rules.xml for dependency update rules -->
+            <!-- Plugin to manage versions of dependencies and plugins, using organization-specific rules for updates
+                can be used to check for outdated dependencies and suggest updates based on the rules defined in the provided rules.xml file
+
+                ./mvn versions:display-property-updates
+            -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>versions-maven-plugin</artifactId>
@@ -244,6 +299,7 @@
             </plugin>
 
 
+            <!-- Plugin to enforce certain rules on the build environment, such as requiring a specific Maven version. In this case, it is configured to require Maven 3.8.6 or higher. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
@@ -268,9 +324,11 @@
         </plugins>
     </build>
 
-
+    <!-- Profiles: these are different build configurations that can be activated based on certain conditions,
+     such as the presence of specific properties. -->
     <profiles>
-        <!-- Profil JVM -->
+        <!-- Profile JVM: this profile is activated when the "jvm" property is set. It configures the build to create
+         a JVM-based application package, build a container image using Jib, and load it into the local Docker registry. -->
         <profile>
             <id>jvm</id>
             <properties>
@@ -278,13 +336,16 @@
                 <quarkus.container-image.build>true</quarkus.container-image.build>
                 <quarkus.container-image.load>true</quarkus.container-image.load>
                 <quarkus.container-image.group>brunoe</quarkus.container-image.group>
-                <quarkus.container-image.name>product-catalog</quarkus.container-image.name>
+                <quarkus.container-image.name>starter-product-catalog</quarkus.container-image.name>
                 <quarkus.container-image.tag>1.0.0-jvm</quarkus.container-image.tag>
                 <quarkus.docker.dockerfile-jvm-path>src/main/docker/Dockerfile.jvm</quarkus.docker.dockerfile-jvm-path>
+                <quarkus.jib.base-jvm-image>registry.access.redhat.com/ubi9/openjdk-21-runtime@sha256:20252d0fd32221be2c6ffa91c19f0344c80c8ce3f054a26a2d7492a172516e53</quarkus.jib.base-jvm-image>
             </properties>
         </profile>
 
-        <!-- Profil Natif -->
+        <!-- Profile Native: this profile is activated when the "native" property is set. It configures the build
+         to create a native executable using GraalVM, build a container image using Jib, and load it into the local
+         Docker registry. It also specifies the builder image to use for building the native executable. -->
         <profile>
             <id>native</id>
             <properties>
@@ -294,50 +355,61 @@
                 <quarkus.container-image.load>true</quarkus.container-image.load>
                 <quarkus.container-image.push>false</quarkus.container-image.push>
                 <quarkus.container-image.group>brunoe</quarkus.container-image.group>
-                <quarkus.container-image.name>product-catalog</quarkus.container-image.name>
+                <quarkus.container-image.name>starter-product-catalog</quarkus.container-image.name>
                 <quarkus.container-image.tag>1.0.0-native</quarkus.container-image.tag>
-                <quarkus.native.builder-image>quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-21</quarkus.native.builder-image>
+                <quarkus.jib.base-native-image>quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-21</quarkus.jib.base-native-image>
             </properties>
         </profile>
+
+        <!-- Profile Sonar: this profile is activated when the "sonar" property is set.
+         It configures the build to run SonarQube analysis for code quality and JaCoCo for code coverage.
+         It sets the SonarQube host URL and authentication token from environment variables,
+         and configures JaCoCo to generate XML reports for SonarQube.
+
+         to used it you NEED to set the SONAR_URL and SONAR_TOKEN environment variables with the appropriate values
+         for your SonarQube instance and authentication token, then you can activate the profile
+         with -Psonar when running the Maven build command.
+
+         -->
         <profile>
-    <id>sonar</id>
-    <properties>
-        <sonar.host.url>${SONAR_URL}</sonar.host.url>
-        <sonar.token>${SONAR_TOKEN}</sonar.token>
-    </properties>
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${jacoco.maven.plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>prepare-agent</id>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>report</id>
-                        <goals>
-                            <goal>report</goal>
-                        </goals>
-                        <configuration>
-                            <formats>
-                                <format>XML</format>
-                            </formats>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.sonarsource.scanner.maven</groupId>
-                <artifactId>sonar-maven-plugin</artifactId>
-                <version>${sonar.maven.plugin.version}</version>
-            </plugin>
-        </plugins>
-    </build>
-</profile>
+            <id>sonar</id>
+            <properties>
+                <sonar.host.url>${SONAR_URL}</sonar.host.url>
+                <sonar.token>${SONAR_TOKEN}</sonar.token>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <version>${jacoco.maven.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>prepare-agent</id>
+                                <goals>
+                                    <goal>prepare-agent</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>report</id>
+                                <goals>
+                                    <goal>report</goal>
+                                </goals>
+                                <configuration>
+                                    <formats>
+                                        <format>XML</format>
+                                    </formats>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonarsource.scanner.maven</groupId>
+                        <artifactId>sonar-maven-plugin</artifactId>
+                        <version>${sonar.maven.plugin.version}</version>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 </project>
