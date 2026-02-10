@@ -114,7 +114,7 @@ jobs:
             -Dquarkus.container-image.password=${{ secrets.DOCKERHUB_TOKEN }} \
             -Dquarkus.container-image.tag=$NATIVE_TAG
 
-  # JOB 3: Documentation (Parallel with Native)
+  # JOB 3: Documentation (Parallel)
   deploy-docs:
     needs: build-jvm
     runs-on: self-hosted
@@ -129,7 +129,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Generate Spec Only
+      - name: Generate Spec
         run: ./mvnw quarkus:generate-code
 
       - name: Set up Node.js
@@ -140,13 +140,13 @@ jobs:
       - name: Build Redoc & Prepare Assets
         run: |
           mkdir -p public
-          # Build HTML and add a download button for the YAML
+          # Corrected flag for download definition
           npx --yes @redocly/cli build-docs \
               target/openapi-spec/openapi.yaml \
               --output public/index.html \
-              --options.downloadDefinitionUrl=openapi.yaml
+              --theme.openapi.downloadDefinitionUrl=openapi.yaml
 
-          # Copy raw YAML for machine/UI download
+          # Copy raw YAML for UI/Client download
           cp target/openapi-spec/openapi.yaml public/openapi.yaml
 
       - name: Deploy to GitHub Pages
@@ -155,9 +155,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
-          # 'main' goes to root, 'develop' goes to /develop folder
           destination_dir: ${{ github.ref == 'refs/heads/main' && '.' || github.ref_name }}
-          # KEEP_FILES=true prevents develop from deleting main and vice versa
           keep_files: true
 
       - name: Upload to GitHub Release (Tags Only)
