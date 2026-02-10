@@ -1,0 +1,151 @@
+---
+openapi: 3.1.0
+components:
+  schemas:
+    CreateProductRequest:
+      description: Request object to create a new product
+      type: object
+      required:
+      - sku
+      - name
+      - price
+      properties:
+        sku:
+          type: string
+          description: Unique SKU of the product
+          examples:
+          - SKU123
+          pattern: \S
+        name:
+          type: string
+          description: Name of the product
+          examples:
+          - Office Chair
+          pattern: \S
+        price:
+          type: number
+          description: Unit price
+          examples:
+          - 50.00
+          minimum: 0
+        stock:
+          type: integer
+          format: int32
+          description: Initial stock quantity
+          examples:
+          - 10
+          minimum: 0
+    ProductDTO:
+      description: Product representation for public API responses
+      type: object
+      properties:
+        sku:
+          type: string
+          description: Unique product identifier
+          examples:
+          - SKU123
+        name:
+          type: string
+          description: Product name
+          examples:
+          - Office Chair
+        price:
+          type: number
+          description: Product price
+          examples:
+          - 50.00
+        stock:
+          type: integer
+          format: int32
+          description: Available stock quantity
+          examples:
+          - 10
+tags:
+- name: Product
+  description: Validated and documented production-ready API
+paths:
+  /api/v1/products:
+    get:
+      summary: Get all products
+      description: Returns a list of all products in the catalog
+      tags:
+      - Product
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductDTO"
+    post:
+      summary: Create a new product
+      description: Validates input and persists a new product
+      tags:
+      - Product
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+        required: true
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDTO"
+        "400":
+          description: Invalid input or domain validation failure
+        "409":
+          description: SKU already exists
+  /api/v1/products/{sku}:
+    get:
+      summary: Get product by SKU
+      description: Finds a specific product using its unique SKU
+      tags:
+      - Product
+      parameters:
+      - description: The SKU of the product
+        examples: {}
+        required: true
+        name: sku
+        in: path
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDTO"
+        "404":
+          description: Product not found
+    delete:
+      summary: Delete a product
+      description: Removes a product from the database by its SKU
+      tags:
+      - Product
+      parameters:
+      - description: The SKU of the product to delete
+        required: true
+        name: sku
+        in: path
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Product deleted
+        "404":
+          description: Product not found
+info:
+  title: starter-product-catalog API
+  version: 1.0.0-SNAPSHOT
+servers:
+- url: http://localhost:8080
+  description: Auto generated value
+- url: http://0.0.0.0:8080
+  description: Auto generated value
