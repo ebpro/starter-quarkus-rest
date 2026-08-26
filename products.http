@@ -11,16 +11,16 @@
 # Tests ProductResource V
 ########################################
 
-### GET all products V1
-GET {{baseUrl}}/api/V1/products
+### GET all products v1
+GET {{baseUrl}}/api/v1/products
 Accept: application/json
 
-### GET product by SKU V1
-GET {{baseUrl}}/api/V1/products/P001
+### GET product by SKU v1
+GET {{baseUrl}}/api/v1/products/P001
 Accept: application/json
 
-### POST create product V1
-POST {{baseUrl}}/api/V1/products
+### POST create product v1
+POST {{baseUrl}}/api/v1/products
 Content-Type: application/json
 
 {
@@ -30,5 +30,5 @@ Content-Type: application/json
   "stock": 500
 }
 
-### DELETE product V1
-DELETE {{baseUrl}}/api/V1/products/P005
+### DELETE product v1
+DELETE {{baseUrl}}/api/v1/products/P005

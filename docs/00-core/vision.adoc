@@ -1,0 +1,47 @@
+== Vision
+
+[.lead]
+The *Product Catalog* service is the authoritative backend system for managing product
+data within its bounded context. It exposes a stable, versioned REST API for creating,
+retrieving, and deleting products — enforcing strict data integrity and architectural
+boundaries throughout.
+
+=== Purpose
+
+The system exists to give backend consumers (store management systems, internal
+microservices, frontend applications) a *predictable, contract-stable* interface to the
+product catalog. Consumers can rely on consistent HTTP semantics, structured error
+responses, and guaranteed persistence.
+
+=== Design Principles
+
+[cols="1,4",options="header",stripes=odd]
+|===
+|Principle |Rationale
+
+|*Consistency over feature richness*
+|A narrow, rock-solid API surface is more valuable than a broad, fragile one.
+
+|*Simplicity over flexibility*
+|Each endpoint does exactly one thing; no generic query DSL, no partial updates.
+
+|*Explicit over implicit*
+|HTTP status codes, error shapes, and domain exceptions are always named and mapped.
+
+|*Traceability by default*
+|Every requirement traces to a design decision, an implementation, and a passing test.
+Nothing ships without evidence.
+|===
+
+=== Bounded Context Boundary
+
+[NOTE]
+The Product Catalog is a *single bounded context*. It owns the `Product` aggregate root.
+No other service writes to the product table. External consumers read via the REST API only.
+
+.Out of scope (intentionally excluded from v1)
+* Product update / partial patch
+* Bulk import / export
+* Media or digital-asset management
+* Pricing rules or promotions
+* Cross-context event publishing (future epic)

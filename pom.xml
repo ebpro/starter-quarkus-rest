@@ -43,9 +43,24 @@
         <sonar.maven.plugin.version>5.5.0.6356</sonar.maven.plugin.version>
         <!-- JaCoCo (code coverage) plugin version -->
         <jacoco.maven.plugin.version>0.8.14</jacoco.maven.plugin.version>
+        <!-- Asciidoctor plugin versions (living documentation) -->
+        <asciidoctor.maven.plugin.version>3.2.0</asciidoctor.maven.plugin.version>
+        <asciidoctorj.diagram.version>2.3.1</asciidoctorj.diagram.version>
 
         <!-- For reproducible builds -->
         <project.build.outputTimestamp>2026-02-07T15:00:00Z</project.build.outputTimestamp>
+
+        <!-- Documentation -->
+        <asciidoctor.maven.plugin.version>3.2.0</asciidoctor.maven.plugin.version>
+        <asciidoctorj.diagram.version>2.3.1</asciidoctorj.diagram.version>
+        <asciidoctorj.pdf.version>2.3.19</asciidoctorj.pdf.version>
+
+        <docs.source.dir>${project.basedir}/docs</docs.source.dir>
+        <docs.output.dir>${project.build.directory}/living-docs</docs.output.dir>
+        <docs.images.dir>images</docs.images.dir>
+
+        <!-- GMavenPlus for Groovy scripts in build -->
+        <gmavenplus.plugin.version>4.3.1</gmavenplus.plugin.version>
     </properties>
 
     <!-- Import Quarkus platform BOM for dependency version management -->
@@ -279,6 +294,9 @@
                         <native.image.path>${project.build.directory}/${project.build.finalName}-runner</native.image.path>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
+                        <cucumber.plugin>
+                            pretty,json:${project.build.directory}/cucumber-reports/cucumber.json
+                        </cucumber.plugin>
                     </systemPropertyVariables>
                     <forkNode implementation="org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory"/>
                 </configuration>
@@ -359,6 +377,114 @@
                 <quarkus.container-image.tag>1.0.0-native</quarkus.container-image.tag>
                 <quarkus.jib.base-native-image>quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-21</quarkus.jib.base-native-image>
             </properties>
+        </profile>
+
+        <!-- Profile Docs: generate a living documentation page with UML diagrams. -->
+        <profile>
+            <id>docs</id>
+
+            <build>
+                <plugins>
+
+                    <!-- Harvest cucumber.json → _traceability-table.adoc -->
+                    <plugin>
+                        <groupId>org.codehaus.gmavenplus</groupId>
+                        <artifactId>gmavenplus-plugin</artifactId>
+                        <version>${gmavenplus.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>generate-traceability-matrix</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>execute</goal>
+                                </goals>
+                                <configuration>
+                                    <scripts>
+                                        <script>file:///${project.basedir}/src/docs/scripts/traceability-generator.groovy</script>
+                                    </scripts>
+                                </configuration>
+                            </execution>
+                        </executions>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.apache.groovy</groupId>
+                                <artifactId>groovy-json</artifactId>
+                                <version>5.0.6</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.asciidoctor</groupId>
+                        <artifactId>asciidoctor-maven-plugin</artifactId>
+                        <version>${asciidoctor.maven.plugin.version}</version>
+
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.asciidoctor</groupId>
+                                <artifactId>asciidoctorj-diagram</artifactId>
+                                <version>${asciidoctorj.diagram.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.asciidoctor</groupId>
+                                <artifactId>asciidoctorj-pdf</artifactId>
+                                <version>${asciidoctorj.pdf.version}</version>
+                            </dependency>
+                        </dependencies>
+
+                        <configuration>
+                            <sourceDirectory>${docs.source.dir}</sourceDirectory>
+                            <attributes>
+                                <toc>left</toc>
+                                <sectnums>true</sectnums>
+                                <doctype>book</doctype>
+                                <icons>font</icons>
+                                <source-highlighter>rouge</source-highlighter>
+                                <imagesdir>${docs.images.dir}</imagesdir>
+                                <diagram-cachedir>${project.build.directory}/diagram-cache</diagram-cachedir>
+                                <plantuml-format>svg</plantuml-format>
+                                <project-name>${project.artifactId}</project-name>
+                                <revnumber>${project.version}</revnumber>
+                                <revdate>${maven.build.timestamp}</revdate>
+                                <allow-uri-read>false</allow-uri-read>
+                                <reproducible>true</reproducible>
+                                <generated-docs-dir>${project.build.directory}/generated-docs</generated-docs-dir>
+                            </attributes>
+                            <requires>
+                                <require>asciidoctor-diagram</require>
+                            </requires>
+                            <sourceDocumentName>index.adoc</sourceDocumentName>
+                        </configuration>
+
+                        <executions>
+                            <execution>
+                                <id>generate-html-docs</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>process-asciidoc</goal>
+                                </goals>
+                                <configuration>
+                                    <backend>html5</backend>
+                                    <outputDirectory>${docs.output.dir}/html</outputDirectory>
+                                </configuration>
+                            </execution>
+
+                            <execution>
+                                <id>generate-pdf-docs</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>process-asciidoc</goal>
+                                </goals>
+                                <configuration>
+                                    <backend>pdf</backend>
+                                    <outputDirectory>${docs.output.dir}/pdf</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                </plugins>
+            </build>
         </profile>
 
         <!-- Profile Sonar: this profile is activated when the "sonar" property is set.

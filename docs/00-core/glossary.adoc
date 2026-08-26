@@ -1,0 +1,128 @@
+== Glossary
+
+[.lead]
+Canonical definitions for every term used in this document, the codebase, and the
+feature files. A shared ubiquitous language prevents ambiguity between product,
+development, and test.
+
+=== Domain Terms
+
+[cols="1,4",options="header",stripes=odd]
+|===
+|Term |Definition
+
+|*Product*
+|The core aggregate root of the bounded context. Represents a sellable item with a
+unique SKU, a human-readable name, a unit price, and a stock quantity. Immutable at
+the domain level (mutations return new instances).
+
+|*SKU* (Stock Keeping Unit)
+|The business-facing unique identifier for a product. Used as the primary lookup key
+in all API operations. Format: free alphanumeric string (e.g. `TV-1`, `LAP-42`).
+
+|*Catalog*
+|The collection of all Products managed by this service. The catalog is the primary
+business dataset; it has no explicit aggregate root of its own.
+
+|*Store Manager*
+|The primary actor who performs create, retrieve, and delete operations through the API.
+Represents any upstream service or human operator with write access.
+|===
+
+=== Application & API Terms
+
+[cols="1,4",options="header",stripes=odd]
+|===
+|Term |Definition
+
+|*REST API*
+|The HTTP interface exposed by `ProductResource`. Follows Richardson Maturity Level 2:
+resources + HTTP verbs + status codes.
+
+|*DTO* (Data Transfer Object)
+|A plain object used to move data across layer boundaries (API ↔ Application).
+Contains no business logic. Example: `ProductDTO`, `CreateProductRequest`.
+
+|*Endpoint*
+|A specific URL path + HTTP method combination. Example: `POST /api/v1/products`.
+
+|*URI Versioning*
+|The strategy of embedding the API version in the path (`/api/v1/...`) to allow
+non-breaking evolution.
+
+|*Resource*
+|The JAX-RS class that handles HTTP routing and delegates to the service layer.
+Example: `ProductResource`.
+|===
+
+=== Architecture Terms
+
+[cols="1,4",options="header",stripes=odd]
+|===
+|Term |Definition
+
+|*Bounded Context*
+|A semantic boundary within which the domain model is internally consistent.
+The Product Catalog is one bounded context; it does not share its model with others.
+
+|*Hexagonal Architecture (advanced)*
+|The layering strategy: domain core at the centre, application use cases wrapping it,
+infrastructure (persistence, HTTP) at the edges. No dependency flows inward from
+infrastructure toward domain.
+
+|*Onion Architecture*
+|A variant of hexagonal architecture that emphasizes the domain model as the core,
+with layers of services and repositories wrapping it. The domain has no dependencies on
+other layers.
+
+|*Repository*
+|The infrastructure abstraction for loading and persisting the `ProductEntity`.
+Hides SQL and ORM details. Example: `ProductRepository`.
+
+|*Entity*
+|The JPA persistence model. Mapped to a database table. Distinct from the domain
+`Product` object. Converted via `ProductMapper`.
+
+|*Service Layer*
+|The application layer (`ProductService`) that orchestrates use cases: validates intent,
+delegates to domain, calls repository, returns DTOs.
+|===
+
+=== Quality & Testing Terms
+
+[cols="1,4",options="header",stripes=odd]
+|===
+|Term |Definition
+
+|*NFR* (Non-Functional Requirement)
+|A quality constraint that does not describe a business scenario but must be enforced.
+Examples: latency, error-handling, architecture rules.
+
+|*BDD* (Behaviour-Driven Development)
+|A specification style using human-readable Given/When/Then scenarios. Scenarios are
+the *acceptance criteria* and the *automated tests* at the same time.
+
+|*Cucumber Feature*
+|A `.feature` file containing one or more BDD scenarios. Each file corresponds to
+exactly one User Story in this project.
+
+|*Cucumber Step Definition*
+|The Java method that implements the logic for a Given/When/Then step. Example:
+`@Given("a product with SKU {string} exists")`. Step definitions can call the API, manipulate test data, or assert responses.
+
+|*Traceability*
+|The explicit chain: Requirement → Design decision → Implementation → Passing test.
+Every row in the traceability matrix must have green evidence from CI.
+
+|*ArchUnit*
+|A Java library for writing executable architecture rules. Used here to enforce
+layer isolation and naming conventions at build time.
+
+|*Testcontainers*
+|A Java library that starts real Docker containers (PostgreSQL) during integration
+tests to ensure environment parity with production.
+
+|*Living Documentation*
+|Documentation that is generated from, and kept in sync with, the actual codebase and
+test results. This document is an example: it becomes stale the moment tests drift.
+|===

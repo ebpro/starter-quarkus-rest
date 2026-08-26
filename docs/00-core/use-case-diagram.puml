@@ -1,0 +1,17 @@
+@startuml
+title Product Catalog - Use Case Overview
+left to right direction
+
+actor "Store Manager" as Manager
+
+rectangle "Product Catalog Service" {
+  usecase "Create Product"
+  usecase "Retrieve Products"
+  usecase "Delete Product"
+}
+
+Manager --> "Create Product"
+Manager --> "Retrieve Products"
+Manager --> "Delete Product"
+
+@enduml

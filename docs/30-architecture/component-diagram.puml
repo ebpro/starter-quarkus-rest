@@ -1,0 +1,67 @@
+@startuml
+title Product Catalog — Component Diagram (C4 Level 2)
+left to right direction
+
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor #EEF3FF
+  BorderColor #3366CC
+  FontSize 12
+}
+skinparam database {
+  BackgroundColor #E8F5E9
+  BorderColor #388E3C
+}
+skinparam arrow {
+  Color #555555
+  FontSize 10
+}
+
+actor "Store Manager" as Client
+
+package "API Layer\norg.acme.catalog.product.api" {
+  component "ProductResource\n(JAX-RS)" as Resource
+  component "ExceptionMappers\n(Global, Conflict, NotFound, Jackson)" as Mappers
+}
+
+package "Application Layer\norg.acme.catalog.product.application" {
+  component "ProductService\n(Use Case Orchestration)" as Service
+  component "ProductDTO\nCreateProductRequest" as DTOs
+}
+
+package "Domain Layer\norg.acme.catalog.product.domain" {
+  component "Product\n(Aggregate Root — pure Java)" as Domain
+}
+
+package "Infrastructure Layer\norg.acme.catalog.product.infrastructure" {
+  component "ProductRepository\n(Panache)" as Repo
+  component "ProductEntity\n(JPA @Entity)" as Entity
+  component "ProductMapper\n(MapStruct / manual)" as Mapper
+}
+
+database "PostgreSQL\n(Testcontainers in tests)" as DB
+
+Client --> Resource : HTTP requests\n(JSON/REST)
+Resource --> Mappers : exception handling
+Resource --> Service : delegates use cases
+Service --> DTOs : input / output
+Service --> Domain : business rules
+Service --> Repo : persistence
+Repo --> Entity : JPA operations
+Entity --> DB : SQL / ACID
+Mapper --> Entity : maps from request
+Mapper --> DTOs : maps to response
+Mapper ..> Domain : validates through
+
+note bottom of Domain
+  Zero dependencies on
+  Quarkus / JPA / REST
+  (enforced by ArchUnit)
+end note
+
+note bottom of DB
+  Real PostgreSQL in
+  integration tests via
+  Testcontainers
+end note
+@enduml
