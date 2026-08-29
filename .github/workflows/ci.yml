@@ -20,7 +20,7 @@ env:
 jobs:
   # JOB 1: Test, Push JVM, and Deploy Docs
   build-jvm-and-docs:
-    runs-on: self-hosted
+    runs-on: ebpro-org
     outputs:
       primary_tag: ${{ steps.tag_logic.outputs.primary }}
     steps:
@@ -114,7 +114,7 @@ jobs:
   build-native:
     needs: build-jvm-and-docs
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    runs-on: self-hosted
+    runs-on: ebpro-org
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
