@@ -36,13 +36,10 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build & Sonar
-        env:
-          SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Build & Test
         run: |
           unset DOCKER_METADATA_OUTPUT_JSON
-          ./mvnw -B clean verify sonar:sonar -Psonar -Dproject.build.outputTimestamp=${{ env.TIMESTAMP }}
+          ./mvnw -B clean verify -Dproject.build.outputTimestamp=${{ env.TIMESTAMP }}
 
       - name: Docker Metadata
         id: meta
